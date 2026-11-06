@@ -12,28 +12,29 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-REST = "https://www.okx.com"
+REST = ["https://app.okx.com", "https://www.okx.com"]  # 主域名慢/不通时自动切备用
 CST = timezone(timedelta(hours=8))
 UA = {"User-Agent": "Mozilla/5.0 btc-scan/2.0", "Content-Type": "application/json"}
 
 
 def _request(method, path, params=None, body=None, retries=2):
-    url = REST + path
-    if params:
-        url += "?" + urllib.parse.urlencode(params)
     data = json.dumps(body).encode() if body is not None else None
     last = None
-    for _ in range(retries + 1):
-        try:
-            req = urllib.request.Request(url, data=data, headers=UA, method=method)
-            with urllib.request.urlopen(req, timeout=20) as r:
-                out = json.load(r)
-            if out.get("code") == "0":
-                return out["data"]
-            last = RuntimeError(f"OKX {path} code={out.get('code')} {out.get('msg')}")
-        except Exception as e:  # noqa: BLE001
-            last = e
-            time.sleep(0.8)
+    for base in REST:
+        url = base + path
+        if params:
+            url += "?" + urllib.parse.urlencode(params)
+        for _ in range(retries + 1):
+            try:
+                req = urllib.request.Request(url, data=data, headers=UA, method=method)
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    out = json.load(r)
+                if out.get("code") == "0":
+                    return out["data"]
+                last = RuntimeError(f"OKX {base} code={out.get('code')} {out.get('msg')}")
+            except Exception as e:  # noqa: BLE001
+                last = e
+                time.sleep(0.5)
     raise last
 
 
