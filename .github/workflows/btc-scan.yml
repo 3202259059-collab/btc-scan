@@ -1,0 +1,35 @@
+name: btc-scan
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: btc-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  models: read          # GitHub Models 免费推理，不需要额外 API key
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run scan
+        working-directory: cloud
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          BARK_URL: ${{ secrets.BARK_URL }}
+        run: python3 main.py
