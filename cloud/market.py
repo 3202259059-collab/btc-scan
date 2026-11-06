@@ -17,10 +17,10 @@ CST = timezone(timedelta(hours=8))
 UA = {"User-Agent": "Mozilla/5.0 btc-scan/2.0", "Content-Type": "application/json"}
 
 
-def _request(method, path, params=None, body=None, retries=2):
+def _request(method, path, params=None, body=None, retries=2, hosts=None):
     data = json.dumps(body).encode() if body is not None else None
     last = None
-    for base in REST:
+    for base in (hosts or REST):
         url = base + path
         if params:
             url += "?" + urllib.parse.urlencode(params)
@@ -50,14 +50,16 @@ def ticker(inst):
 
 def indicators():
     """4H RSI/SuperTrend + 日线 EMA/AHR999，返回扁平字典"""
+    # 指标接口只挂在 www 上（app.okx.com 返回 405），优先走 www
+    IND = ["https://www.okx.com", "https://app.okx.com"]
     i4h = _request("POST", "/api/v5/aigc/mcp/indicators", body={
         "instId": "BTC-USDT", "timeframes": ["4H"],
         "indicators": {"RSI": {"paramList": [14]}, "SUPERTREND": {}},
-    })[0]["data"][0]["timeframes"]["4H"]["indicators"]
+    }, hosts=IND)[0]["data"][0]["timeframes"]["4H"]["indicators"]
     id1 = _request("POST", "/api/v5/aigc/mcp/indicators", body={
         "instId": "BTC-USDT", "timeframes": ["1Dutc"],
         "indicators": {"EMA": {"paramList": [20, 50, 200]}, "AHR999": {}},
-    })[0]["data"][0]["timeframes"]["1Dutc"]["indicators"]
+    }, hosts=IND)[0]["data"][0]["timeframes"]["1Dutc"]["indicators"]
 
     st = i4h["SUPERTREND"][0]["values"]
     ema = id1["EMA"][0]["values"]
