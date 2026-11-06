@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 from datetime import datetime
 
@@ -40,8 +41,10 @@ def _providers():
         yield ("llm", os.environ.get("LLM_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"),
                os.environ.get("LLM_MODEL", "deepseek-chat"), os.environ["LLM_API_KEY"])
     if os.environ.get("GITHUB_TOKEN"):
-        yield ("github-models", "https://models.github.ai/inference",
-               os.environ.get("GH_MODEL", "openai/gpt-4o-mini"), os.environ["GITHUB_TOKEN"])
+        for host in ("https://models.github.ai/inference",
+                     "https://models.inference.ai.azure.com"):
+            yield (f"github-models:{host.split('//')[1].split('/')[0]}", host,
+                   os.environ.get("GH_MODEL", "openai/gpt-4o-mini"), os.environ["GITHUB_TOKEN"])
     yield ("pollinations", "https://text.pollinations.ai/openai", "openai", None)
 
 
@@ -55,8 +58,12 @@ def _call_llm(messages, timeout=90):
             if key:
                 headers["Authorization"] = f"Bearer {key}"
             req = urllib.request.Request(base + "/chat/completions", data=body, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                out = json.load(r)
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    raw = r.read().decode("utf-8", "replace")
+            except urllib.error.HTTPError as e:
+                raise RuntimeError(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]!r}")
+            out = json.loads(raw)
             text = (out["choices"][0]["message"]["content"] or "").strip()
             if text:
                 if name != "llm":
