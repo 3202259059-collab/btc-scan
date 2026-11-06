@@ -29,9 +29,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -s -o /tmp/m.json -w "HTTP %{http_code}\n" https://models.github.ai/inference/chat/completions \
-            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" \
-            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"hi"}],"max_tokens":10}'
-          head -c 400 /tmp/m.json
+            -H "Authorization: Bearer $GITHUB_TOKEN" -H "Content-Type: application/json" -H "Accept: application/json" \
+            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"say hi"}],"max_tokens":20,"stream":false}'
+          echo "bytes: $(wc -c < /tmp/m.json)"
+          cat /tmp/m.json
 
       - name: Run scan
         working-directory: cloud
