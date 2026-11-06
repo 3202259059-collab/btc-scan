@@ -53,7 +53,7 @@ def _call_llm(messages, timeout=90):
     for name, base, model, key in _providers():
         try:
             body = json.dumps({"model": model, "messages": messages,
-                               "temperature": 0.3, "max_tokens": 900}).encode()
+                               "temperature": 0.3, "max_tokens": 2000}).encode()
             headers = {"Content-Type": "application/json"}
             if key:
                 headers["Authorization"] = f"Bearer {key}"
@@ -63,8 +63,28 @@ def _call_llm(messages, timeout=90):
                     raw = r.read().decode("utf-8", "replace")
             except urllib.error.HTTPError as e:
                 raise RuntimeError(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]!r}")
-            out = json.loads(raw)
-            text = (out["choices"][0]["message"]["content"] or "").strip()
+            text = ""
+            try:
+                out = json.loads(raw)
+                text = (out["choices"][0]["message"]["content"] or "").strip()
+            except json.JSONDecodeError:
+                # 兼容纯文本 / SSE 流式返回
+                if raw.lstrip().startswith("data:"):
+                    parts = []
+                    for line in raw.splitlines():
+                        if not line.startswith("data:"):
+                            continue
+                        chunk = line[5:].strip()
+                        if not chunk or chunk == "[DONE]":
+                            continue
+                        try:
+                            j = json.loads(chunk)
+                            parts.append(j["choices"][0].get("delta", {}).get("content") or "")
+                        except Exception:  # noqa: BLE001
+                            pass
+                    text = "".join(parts).strip()
+                else:
+                    text = raw.strip()
             if text:
                 if name != "llm":
                     print(f"[analyze] provider={name}", file=sys.stderr)
